@@ -1,0 +1,23 @@
+﻿<Window x:Class="CybersecurityChatbotWPF.QuizWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cybersecurity Quiz" Height="450" Width="600">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="QuestionTextBlock" FontSize="18" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+        <StackPanel x:Name="AnswerOptionsPanel" Grid.Row="1" VerticalAlignment="Top" />
+
+        <TextBlock x:Name="FeedbackTextBlock" Grid.Row="2" Foreground="DarkGreen" FontWeight="Bold" Margin="0,10,0,0" />
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,40,0,0">
+            <Button x:Name="NextButton" Content="Next" Width="100" IsEnabled="False" Click="NextButton_Click"/>
+            <Button x:Name="QuitButton" Content="Quit" Width="100" Margin="10,0,0,0" Click="QuitButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
