@@ -38,6 +38,7 @@ namespace CybersecurityChatbotWPF
 
         private UserMemory currentUser = new();
         private List<CyberTask> tasks = new();
+        private List<string> activityLog = new();
         private string currentTopic = null;
         private int conversationDepth = 0;
         private const int MaxConversationDepth = 3;
@@ -54,7 +55,6 @@ namespace CybersecurityChatbotWPF
             { "curious", new[] { "why", "how", "what if", "explain", "curious", "question", "wonder", "clarify" }}
         };
 
-        // Enhanced keyword responses with synonyms and keywords list for basic NLP
         private readonly Dictionary<string, (string audio, List<string> responses, List<string> keywords)> KeywordResponsesExtended = new(StringComparer.OrdinalIgnoreCase)
         {
             { "phishing", ("phishing.wav", new List<string> {
@@ -97,6 +97,7 @@ namespace CybersecurityChatbotWPF
             {
                 currentUser.Name = input;
                 AppendChat($"Bot: Welcome, {currentUser.Name}! Ask me about cybersecurity topics like phishing or malware.");
+                LogActivity($"User introduced as {currentUser.Name}");
                 return;
             }
 
@@ -106,11 +107,17 @@ namespace CybersecurityChatbotWPF
             if (normalizedInput == "exit")
             {
                 AppendChat($"Bot: Goodbye {currentUser.Name}, stay safe online!");
+                LogActivity("Session ended by user");
                 Application.Current.Shutdown();
                 return;
             }
 
-            // Use enhanced basic NLP keyword detection to detect intent
+            if (normalizedInput == "show activity log" || normalizedInput == "what have you done for me")
+            {
+                ShowActivityLog();
+                return;
+            }
+
             string detectedIntent = DetectIntent(normalizedInput);
 
             if (detectedIntent != null)
@@ -131,6 +138,7 @@ namespace CybersecurityChatbotWPF
                 var data = KeywordResponsesExtended[detectedIntent];
                 PlayAudio(data.audio);
                 AppendChat($"Bot: {GetResponseForSentiment(data.responses, currentUser.CurrentSentiment)}");
+                LogActivity($"Responded to intent '{detectedIntent}' based on NLP detection");
             }
             else if (ContinuationPhrases.Any(p => normalizedInput.Contains(p)) && currentTopic != null)
             {
@@ -142,14 +150,12 @@ namespace CybersecurityChatbotWPF
             }
         }
 
-        // Detect intent using keyword matching with regex word boundary for better accuracy
         private string DetectIntent(string input)
         {
             foreach (var intent in KeywordResponsesExtended)
             {
                 foreach (var keyword in intent.Value.keywords)
                 {
-                    // Regex pattern for word boundary
                     var pattern = $@"\b{Regex.Escape(keyword)}\b";
                     if (Regex.IsMatch(input, pattern, RegexOptions.IgnoreCase))
                         return intent.Key;
@@ -217,7 +223,6 @@ namespace CybersecurityChatbotWPF
             }
         }
 
-        // Task Assistant
         private void AddTask_Click(object sender, RoutedEventArgs e)
         {
             var title = Interaction.InputBox("Enter task title:", "Add Task", "");
@@ -243,6 +248,7 @@ namespace CybersecurityChatbotWPF
             tasks.Add(task);
             RefreshTaskList();
             AppendChat($"Bot: Task '{title}' added. {(reminderDate.HasValue ? $"I'll remind you on {reminderDate.Value:g}." : "")}");
+            LogActivity($"Task added: {title} (Reminder: {(reminderDate.HasValue ? reminderDate.Value.ToString("g") : "none")})");
         }
 
         private void DeleteTask_Click(object sender, RoutedEventArgs e)
@@ -252,6 +258,7 @@ namespace CybersecurityChatbotWPF
                 tasks.Remove(task);
                 RefreshTaskList();
                 AppendChat($"Bot: Task '{task.Title}' deleted.");
+                LogActivity($"Task deleted: {task.Title}");
             }
         }
 
@@ -262,6 +269,7 @@ namespace CybersecurityChatbotWPF
                 task.IsCompleted = true;
                 RefreshTaskList();
                 AppendChat($"Bot: Task '{task.Title}' marked as completed.");
+                LogActivity($"Task marked completed: {task.Title}");
             }
         }
 
@@ -277,17 +285,34 @@ namespace CybersecurityChatbotWPF
             foreach (var task in tasks.Where(t => t.ReminderDate.HasValue && !t.IsCompleted && t.ReminderDate.Value <= now).ToList())
             {
                 AppendChat($"Bot: Reminder - {task.Title}: {task.Description}");
+                LogActivity($"Reminder triggered for task: {task.Title}");
                 task.ReminderDate = null;
             }
             RefreshTaskList();
         }
 
-        // Button to launch quiz window (unchanged from your previous code)
         private void LaunchQuizButton_Click(object sender, RoutedEventArgs e)
         {
             var quizWindow = new QuizWindow();
             quizWindow.Owner = this;
             quizWindow.ShowDialog();
+            LogActivity("Quiz launched");
+        }
+
+        private void ShowActivityLog()
+        {
+            AppendChat("Bot: Here's your recent activity:");
+            foreach (var entry in activityLog.TakeLast(10))
+            {
+                AppendChat($"- {entry}");
+            }
+        }
+
+        private void LogActivity(string description)
+        {
+            activityLog.Add($"{DateTime.Now:t}: {description}");
+            if (activityLog.Count > 100) // Optional: limit overall size
+                activityLog.RemoveAt(0);
         }
     }
 }
