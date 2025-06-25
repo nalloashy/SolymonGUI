@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
 using NAudio.Wave;
 using System.Windows.Threading;
-using Microsoft.VisualBasic; // Add reference to Microsoft.VisualBasic for InputBox
+using Microsoft.VisualBasic; // For InputBox
 
 namespace CybersecurityChatbotWPF
 {
@@ -55,18 +54,20 @@ namespace CybersecurityChatbotWPF
             { "curious", new[] { "why", "how", "what if", "explain", "curious", "question", "wonder", "clarify" }}
         };
 
-        private readonly Dictionary<string, (string audio, List<string> responses)> KeywordResponses = new(StringComparer.OrdinalIgnoreCase)
+        // Enhanced keyword responses with synonyms and keywords list for basic NLP
+        private readonly Dictionary<string, (string audio, List<string> responses, List<string> keywords)> KeywordResponsesExtended = new(StringComparer.OrdinalIgnoreCase)
         {
             { "phishing", ("phishing.wav", new List<string> {
                 "Phishing is a cyberattack where attackers trick you into revealing personal info.",
                 "Phishing emails can look very convincing. Be cautious.",
                 "Always verify links before clicking to avoid phishing scams."
-            })},
+            }, new List<string> { "phishing", "phish", "phisher", "fake email", "scam email" }) },
+
             { "malware", ("malware.wav", new List<string> {
                 "Malware is software designed to harm or exploit your device.",
                 "Always keep your antivirus updated to defend against malware.",
                 "Be cautious about what you download to prevent malware infections."
-            })}
+            }, new List<string> { "malware", "virus", "trojan", "spyware", "ransomware" }) }
         };
 
         public MainWindow()
@@ -99,37 +100,39 @@ namespace CybersecurityChatbotWPF
                 return;
             }
 
-            input = input.ToLower();
-            currentUser.CurrentSentiment = DetectSentiment(input);
+            string normalizedInput = input.ToLower();
+            currentUser.CurrentSentiment = DetectSentiment(normalizedInput);
 
-            if (input == "exit")
+            if (normalizedInput == "exit")
             {
                 AppendChat($"Bot: Goodbye {currentUser.Name}, stay safe online!");
                 Application.Current.Shutdown();
                 return;
             }
 
-            if (KeywordResponses.Keys.Any(k => input.Contains(k)))
+            // Use enhanced basic NLP keyword detection to detect intent
+            string detectedIntent = DetectIntent(normalizedInput);
+
+            if (detectedIntent != null)
             {
-                string matchedTopic = KeywordResponses.Keys.First(k => input.Contains(k));
-                currentTopic = matchedTopic;
+                currentTopic = detectedIntent;
                 conversationDepth = 1;
 
-                if (!currentUser.DiscussedTopics.Contains(matchedTopic))
-                    currentUser.DiscussedTopics.Add(matchedTopic);
+                if (!currentUser.DiscussedTopics.Contains(detectedIntent))
+                    currentUser.DiscussedTopics.Add(detectedIntent);
 
-                if (currentUser.TopicInterestLevel.ContainsKey(matchedTopic))
-                    currentUser.TopicInterestLevel[matchedTopic]++;
+                if (currentUser.TopicInterestLevel.ContainsKey(detectedIntent))
+                    currentUser.TopicInterestLevel[detectedIntent]++;
                 else
-                    currentUser.TopicInterestLevel[matchedTopic] = 1;
+                    currentUser.TopicInterestLevel[detectedIntent] = 1;
 
                 currentUser.FavoriteTopic = currentUser.TopicInterestLevel.OrderByDescending(x => x.Value).First().Key;
 
-                var data = KeywordResponses[matchedTopic];
+                var data = KeywordResponsesExtended[detectedIntent];
                 PlayAudio(data.audio);
                 AppendChat($"Bot: {GetResponseForSentiment(data.responses, currentUser.CurrentSentiment)}");
             }
-            else if (ContinuationPhrases.Any(p => input.Contains(p)) && currentTopic != null)
+            else if (ContinuationPhrases.Any(p => normalizedInput.Contains(p)) && currentTopic != null)
             {
                 ContinueConversation();
             }
@@ -137,6 +140,22 @@ namespace CybersecurityChatbotWPF
             {
                 AppendChat("Bot: I didn't understand. Please ask about topics like phishing or malware.");
             }
+        }
+
+        // Detect intent using keyword matching with regex word boundary for better accuracy
+        private string DetectIntent(string input)
+        {
+            foreach (var intent in KeywordResponsesExtended)
+            {
+                foreach (var keyword in intent.Value.keywords)
+                {
+                    // Regex pattern for word boundary
+                    var pattern = $@"\b{Regex.Escape(keyword)}\b";
+                    if (Regex.IsMatch(input, pattern, RegexOptions.IgnoreCase))
+                        return intent.Key;
+                }
+            }
+            return null;
         }
 
         private void ContinueConversation()
@@ -149,7 +168,7 @@ namespace CybersecurityChatbotWPF
                 return;
             }
 
-            var data = KeywordResponses[currentTopic];
+            var data = KeywordResponsesExtended[currentTopic];
             conversationDepth++;
             AppendChat($"Bot: {GetResponseForSentiment(data.responses, currentUser.CurrentSentiment)}");
         }
@@ -263,7 +282,7 @@ namespace CybersecurityChatbotWPF
             RefreshTaskList();
         }
 
-        // Launch Quiz Window
+        // Button to launch quiz window (unchanged from your previous code)
         private void LaunchQuizButton_Click(object sender, RoutedEventArgs e)
         {
             var quizWindow = new QuizWindow();
